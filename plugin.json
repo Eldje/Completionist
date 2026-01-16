@@ -1,11 +1,13 @@
 {
-  "name": "Example Plugin",
-  "author": "John Doe",
-  "flags": ["debug", "_root"],
-  "api_version": 1,
-  "publish": {
-    "tags": ["template", "root"],
-    "description": "Decky example plugin.",
-    "image": "https://opengraph.githubassets.com/1/SteamDeckHomebrew/PluginLoader"
-  }
+  "name": "completionist",
+  "friendly_name": "Completionist",
+  "description": "Mark your games as completed",
+  "author": "Eldje",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "python_metadata": {
+    "main": "main.py",
+    "bin": "python3"
+  },
+  "flags": []
 }
