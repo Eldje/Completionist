@@ -1,51 +1,65 @@
 import {
   definePlugin,
   ServerAPI,
+  staticRender,
 } from "decky-frontend-lib";
-import React, { useState, FC } from "react";
+import { useState, VFC } from "react";
+import { FaBug } from "react-icons/fa";
 
-// On définit le composant de contenu de manière très simple
-const Content: FC<{ api: ServerAPI }> = ({ api }) => {
-  const [msg, setMsg] = useState("Prêt");
+const Content: VFC<{ serverApi: ServerAPI }> = ({ serverApi }) => {
+  const [rawResponse, setRawResponse] = useState<string>("No data yet");
 
-  const callPython = async () => {
-    setMsg("Appel en cours..."); // Pour confirmer que le clic fonctionne
+  const runDiagnostic = async () => {
+    setRawResponse("Calling Python...");
     try {
-      // Correction ici : on utilise 'api' (passé en props) et non 'serverApi'
-      const res = await api.callPluginMethod("get_status", {});
+      const res = await serverApi.callPluginMethod("get_local_games", {});
       
-      if (res.success) {
-          // Decky place le retour du Python dans res.result
-          // Si ton Python renvoie un dictionnaire {"data": "..."}
-          const data = res.result?.data || JSON.stringify(res.result);
-          setMsg(`Succès : ${data}`);
-      } else {
-          setMsg(`Erreur : ${res.error || "Réponse False"}`);
-      }
+      // On convertit l'objet complet en texte pour le voir à l'écran
+      // indenté avec 2 espaces pour la lisibilité
+      const jsonString = JSON.stringify(res, null, 2);
+      setRawResponse(jsonString);
+      
     } catch (e) {
-      setMsg(`Crash JS : ${String(e)}`);
+      setRawResponse(`RPC Error: ${String(e)}`);
     }
   };
 
   return (
-    <div style={{ padding: "10px" }}>
-      <p style={{ color: "white", marginBottom: "10px" }}>{msg}</p>
+    <div style={{ padding: "10px", color: "white" }}>
       <button 
-        onClick={callPython}
-        style={{ width: "100%", padding: "5px" }}
+        onClick={runDiagnostic} 
+        style={{ 
+          backgroundColor: "#3d4450", 
+          padding: "8px", 
+          borderRadius: "4px",
+          marginBottom: "10px" 
+        }}
       >
-        Tester Python
+        🔍 Run Backend Diagnostic
       </button>
+
+      <div style={{ marginTop: "10px" }}>
+        <p><strong>Raw Backend Output:</strong></p>
+        <pre style={{ 
+          backgroundColor: "#1a1b1e", 
+          padding: "10px", 
+          borderRadius: "5px", 
+          fontSize: "10px",
+          overflowX: "auto",
+          whiteSpace: "pre-wrap",
+          wordBreak: "break-all"
+        }}>
+          {rawResponse}
+        </pre>
+      </div>
     </div>
   );
 };
 
-// L'exportation doit être la plus simple possible pour Steam
 export default definePlugin((serverApi: ServerAPI) => {
   return {
-    title: "Completionist", // String pure, pas de JSX
-    content: <Content api={serverApi} />,
-    icon: undefined, // On retire l'icône pour l'instant
-    onDismount() {}
+    title: <div className="static-auth-title">completionist DEBUG</div>,
+    content: <Content serverApi={serverApi} />,
+    icon: <FaBug />,
   };
 });
