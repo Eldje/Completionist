@@ -3,6 +3,7 @@
   "friendly_name": "Completionist",
   "description": "Mark your games as completed",
   "author": "Eldje",
+  "api_version": 1,
   "version": "1.0.0",
   "main": "dist/index.js",
   "python_metadata": {

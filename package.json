@@ -1,12 +1,13 @@
 {
   "name": "completionist",
-  "version": "1.0.0",
-  "description": "Mark your games as completed",
-  "type": "commonjs",
+  "version": "0.0.1",
+  "description": "A template to quickly create decky plugins from scratch, based on TypeScript and webpack",
+  "type": "module",
   "scripts": {
-  "build": "rollup -c rollup.config.mjs",
-  "watch": "rollup -c rollup.config.mjs -w"
-},
+    "build": "rollup -c",
+    "watch": "rollup -c -w",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/SteamDeckHomebrew/decky-plugin-template.git"
