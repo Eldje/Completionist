@@ -1,10 +1,12 @@
 import { definePlugin } from "@decky/api";
-import { afterPatch, wrapReactType } from "@decky/ui";
+import { afterPatch, wrapReactType, Patch } from "@decky/ui";
 import { FaCircle } from "react-icons/fa";
 
 const React = (window as any).SP_REACT;
 
-// Memoized sticker to prevent internal re-renders
+/**
+ * Sticker Component - Memoized to prevent unnecessary re-renders.
+ */
 const GameSticker = React.memo(({ appId }: { appId: number }) => (
   <div style={{
     position: "absolute",
@@ -24,42 +26,55 @@ const GameSticker = React.memo(({ appId }: { appId: number }) => (
 ));
 
 export default definePlugin(() => {
-  // 1. We look for the specific GameCapsule component in Steam's internal modules
-  // This is much lighter than intercepting every createElement
-  afterPatch(React, "createElement", (_, ret: any) => {
-    const appId = ret?.props?.app?.appid;
-    if (!appId) return ret;
+  // Correctly typing the radar as a Patch object
+  let radarPatch: Patch | undefined;
+  let isTargetFound = false;
 
-    const TargetClass = ret.type;
-    // We only patch the class if it hasn't been patched yet
-    if (typeof TargetClass === 'function' && TargetClass.prototype?.render && !TargetClass.prototype.render.__patched) {
-      
-      const originalRender = TargetClass.prototype.render;
-      TargetClass.prototype.render = function(...renderArgs: any[]) {
-        const renderRet = originalRender.apply(this, renderArgs);
+  if (React) {
+    radarPatch = afterPatch(React, "createElement", (_args, ret: any) => {
+      const appId = ret?.props?.app?.appid;
+      if (!appId) return ret;
+
+      const TargetClass = ret.type;
+      if (typeof TargetClass === 'function' && TargetClass.prototype?.render && !TargetClass.prototype.render.__patched) {
         
-        // OPTIMIZATION: We only add our logic if there is a valid render output
-        if (renderRet) {
-          return React.createElement(
-            React.Fragment,
-            null,
-            renderRet,
-            // this.props contains the app data in a Class component
-            React.createElement(GameSticker, { appId: this.props.app.appid })
-          );
-        }
-        return renderRet;
-      };
+        const originalRender = TargetClass.prototype.render;
+        TargetClass.prototype.render = function(...renderArgs: any[]) {
+          const renderRet = originalRender.apply(this, renderArgs);
+          return renderRet ? (
+            <React.Fragment>
+              {renderRet}
+              <GameSticker appId={this.props.app.appid} />
+            </React.Fragment>
+          ) : renderRet;
+        };
 
-      TargetClass.prototype.render.__patched = true;
-      wrapReactType(TargetClass);
-      console.log(`[Sticker] Permanent surgical patch applied to capsule class.`);
-    }
-    return ret;
-  });
+        TargetClass.prototype.render.__patched = true;
+        wrapReactType(TargetClass);
+        
+        if (!isTargetFound) {
+          isTargetFound = true;
+          console.log("[Sticker] Target found. Scheduling radar shutdown...");
+          
+          // Delayed unpatch to ensure all capsule variants are caught
+          setTimeout(() => {
+            if (radarPatch) {
+              radarPatch.unpatch(); // Calling the correct method
+              radarPatch = undefined;
+              console.log("[Sticker] Radar successfully unpatched.");
+            }
+          }, 2000);
+        }
+      }
+      return ret;
+    });
+  }
 
   return {
     name: "my-custom-sticker",
     icon: <FaCircle />,
+    onDismount() {
+      if (radarPatch) radarPatch.unpatch();
+    }
   };
 });
