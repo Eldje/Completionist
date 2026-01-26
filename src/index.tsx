@@ -1,85 +1,65 @@
-import {
-    routerHook,
-    definePlugin
-} from "@decky/api";
-import {
-    afterPatch,
-    findInReactTree,
-    wrapReactType,
-} from "@decky/ui";
-import { ReactElement } from "react";
+import { definePlugin } from "@decky/api";
+import { afterPatch, wrapReactType } from "@decky/ui";
 import { FaCircle } from "react-icons/fa";
 
-// Your sticker component
-// Component for the sticker - Positioned absolutely over the capsule
-const GameSticker = ({ appId }: { appId: number }) => (
-  <div 
-    key="sticker-overlay"
-    style={{
-      position: "absolute",
-      top: "-10px", // Appears slightly above the capsule
-      right: "-10px",
-      backgroundColor: "#ff1a1a", // Red for visibility
-      color: "white",
-      borderRadius: "12px",
-      padding: "4px 8px",
-      fontSize: "12px",
-      fontWeight: "bold",
-      zIndex: 9999,
-      boxShadow: "0 4px 6px rgba(0,0,0,0.3)",
-      pointerEvents: "none",
-      border: "2px solid white"
-    }}
-  >
+const React = (window as any).SP_REACT;
+
+// Memoized sticker to prevent internal re-renders
+const GameSticker = React.memo(({ appId }: { appId: number }) => (
+  <div style={{
+    position: "absolute",
+    top: "10px",
+    right: "10px",
+    backgroundColor: "#1a9fff",
+    color: "white",
+    borderRadius: "4px",
+    padding: "2px 6px",
+    fontSize: "10px",
+    fontWeight: "bold",
+    zIndex: 9999,
+    pointerEvents: "none"
+  }}>
     ID: {appId}
   </div>
-);
+));
 
 export default definePlugin(() => {
-  const React = (window as any).SP_REACT;
-  
-  if (React) {
-    afterPatch(React, "createElement", (args, ret: any) => {
-      const appId = ret?.props?.app?.appid;
-      
-      if (appId) {
-        const TargetClass = ret.type;
-        
-        if (typeof TargetClass === 'function' && TargetClass.prototype?.render && !TargetClass.prototype.render.__patched) {
-          const originalRender = TargetClass.prototype.render;
-          
-          TargetClass.prototype.render = function(...renderArgs: any[]) {
-            const renderRet = originalRender.apply(this, renderArgs);
-            
-            if (renderRet) {
-              // We use a Fragment to return both the original element AND our sticker
-              // This way, the original element's props and refs stay intact for Steam
-              return React.createElement(
-                React.Fragment,
-                null,
-                renderRet,
-                React.createElement(GameSticker, { appId: appId })
-              );
-            }
-            return renderRet;
-          };
-          
-          TargetClass.prototype.render.__patched = true;
-          wrapReactType(TargetClass);
-          console.log(`[Sticker] Overlay injected for ${appId}`);
-        }
-      }
-      return ret;
-    });
-  }
+  // 1. We look for the specific GameCapsule component in Steam's internal modules
+  // This is much lighter than intercepting every createElement
+  afterPatch(React, "createElement", (_, ret: any) => {
+    const appId = ret?.props?.app?.appid;
+    if (!appId) return ret;
 
-  // Return the plugin object with required interface (name, icon)
+    const TargetClass = ret.type;
+    // We only patch the class if it hasn't been patched yet
+    if (typeof TargetClass === 'function' && TargetClass.prototype?.render && !TargetClass.prototype.render.__patched) {
+      
+      const originalRender = TargetClass.prototype.render;
+      TargetClass.prototype.render = function(...renderArgs: any[]) {
+        const renderRet = originalRender.apply(this, renderArgs);
+        
+        // OPTIMIZATION: We only add our logic if there is a valid render output
+        if (renderRet) {
+          return React.createElement(
+            React.Fragment,
+            null,
+            renderRet,
+            // this.props contains the app data in a Class component
+            React.createElement(GameSticker, { appId: this.props.app.appid })
+          );
+        }
+        return renderRet;
+      };
+
+      TargetClass.prototype.render.__patched = true;
+      wrapReactType(TargetClass);
+      console.log(`[Sticker] Permanent surgical patch applied to capsule class.`);
+    }
+    return ret;
+  });
+
   return {
-    name: "my-custom-sticker", // Matches your folder name requirement
+    name: "my-custom-sticker",
     icon: <FaCircle />,
-    onDismount() {
-      // Decky handles patch removal automatically
-      console.log("Sticker plugin unmounted successfully");
-    },
   };
 });
