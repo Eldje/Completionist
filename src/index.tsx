@@ -1,22 +1,28 @@
 import { definePlugin } from "@decky/api";
-import { afterPatch, wrapReactType, Patch } from "@decky/ui";
+import { afterPatch, Patch } from "@decky/ui";
 import { FaCircle } from "react-icons/fa";
 
 const React = (window as any).SP_REACT;
 
+/**
+ * Sticker Component - Positioned at the bottom-right
+ */
 const GameSticker = React.memo(({ appId }: { appId: number }) => {
-  if (!appId) return null;
+  console.log(`[Completionist] LOG 10: Final Render of GameSticker for ${appId}`);
   return (
     <div style={{
       position: "absolute",
-      top: "10px",
-      right: "10px",
+      bottom: "10px",    // Positioned at the bottom
+      right: "10px",     // Positioned at the right
       backgroundColor: "#1a9fff",
       color: "white",
+      padding: "6px 12px",
       borderRadius: "4px",
-      padding: "4px 8px",
-      fontSize: "12px",
       zIndex: 9999,
+      border: "1px solid rgba(255,255,255,0.4)",
+      fontSize: "12px",
+      fontWeight: "bold",
+      boxShadow: "0 2px 8px rgba(0,0,0,0.6)",
       pointerEvents: "none"
     }}>
       ID: {appId}
@@ -26,80 +32,51 @@ const GameSticker = React.memo(({ appId }: { appId: number }) => {
 
 export default definePlugin(() => {
   let radarPatch: Patch | undefined;
-  let isTargetFound = false;
 
-  console.log("[Completionist] DEBUG: Plugin starting...");
-
-  if (!React) {
-    console.error("[Completionist] DEBUG ERROR: React (SP_REACT) not found!");
-  }
+  console.log("[Completionist] LOG 1: Plugin Starting");
 
   if (React) {
-    radarPatch = afterPatch(React, "createElement", (_args, ret: any) => {
+    console.log("[Completionist] LOG 2: React Found");
+
+    // We use "_" for unused "args" to satisfy the compiler
+    radarPatch = afterPatch(React, "createElement", (_, ret: any) => {
+      const logoUrl = ret?.props?.strLogoImageURL;
+      if (!logoUrl) return ret;
+
+      console.log("[Completionist] LOG 4: Logo detected ->", logoUrl);
+
+      const match = logoUrl.match(/\/assets\/([0-9]+)\//);
+      const appId = match ? parseInt(match[1]) : null;
+
+      if (!appId) return ret;
+
+      console.log(`[Completionist] LOG 6: Encapsulating for App ${appId}`);
+
       try {
-        // --- STEP 1: Capture return object ---
-        if (!ret) return ret;
+        if (ret.__alreadyWrapped) return ret;
 
-        // --- STEP 2: Check for logo property ---
-        const logoUrl = ret?.props?.strLogoImageURL;
-        if (!logoUrl) return ret;
+        console.log("[Completionist] LOG 7: Creating Wrap Element");
 
-        console.log("[Completionist] DEBUG 1: Logo URL detected ->", logoUrl);
+        const newRet = React.createElement(
+          "div", // We use a div as a container to ensure relative positioning
+          { 
+            style: { position: "relative", display: "contents" },
+            __alreadyWrapped: true 
+          },
+          ret,
+          React.createElement(GameSticker, { appId: appId })
+        );
 
-        // --- STEP 3: Regex Match ---
-        // I corrected the regex: [0-9] instead of \[0-9\]
-        const match = logoUrl.match(/\/assets\/([0-9]+)\//);
-        const appId = match ? parseInt(match[1]) : null;
-        console.log("[Completionist] DEBUG 2: AppID extracted ->", appId);
+        // Mark the object manually as well
+        newRet.__alreadyWrapped = true;
 
-        if (!appId) return ret;
+        console.log("[Completionist] LOG 8: Return successfully encapsulated (Bottom-Right)");
+        return newRet;
 
-        // --- STEP 4: Component Type Check ---
-        const TargetClass = ret.type;
-        console.log("[Completionist] DEBUG 3: Target type is ->", typeof TargetClass);
-
-        if (typeof TargetClass === 'function' && !TargetClass.__patched) {
-          console.log("[Completionist] DEBUG 4: Patching component 'P'...");
-
-          const OriginalComponent = TargetClass;
-
-          // --- STEP 5: Wrapper Logic ---
-          ret.type = (props: any) => {
-            try {
-              const res = OriginalComponent(props);
-              return (
-                <React.Fragment>
-                  {res}
-                  <GameSticker appId={appId} />
-                </React.Fragment>
-              );
-            } catch (e) {
-              console.error("[Completionist] DEBUG ERROR: Crash inside Wrapper ->", e);
-              return null;
-            }
-          };
-
-          // --- STEP 6: Finalizing Patch ---
-          ret.type.__patched = true;
-          console.log("[Completionist] DEBUG 5: Wrapping React Type...");
-          wrapReactType(ret.type);
-          
-          if (!isTargetFound) {
-            isTargetFound = true;
-            console.log("[Completionist] DEBUG 6: Target secured. Deactivating radar soon.");
-            setTimeout(() => {
-              if (radarPatch) {
-                radarPatch.unpatch();
-                radarPatch = undefined;
-                console.log("[Completionist] DEBUG 7: Radar off.");
-              }
-            }, 2000);
-          }
-        }
-      } catch (err) {
-        console.error("[Completionist] DEBUG GLOBAL CRASH:", err);
+      } catch (e) {
+        console.error("[Completionist] LOG ERROR: Encapsulation failed", e);
+        return ret;
       }
-      return ret;
     });
   }
 
@@ -108,6 +85,7 @@ export default definePlugin(() => {
     title: "Completionist",
     icon: <FaCircle />,
     onDismount() {
+      console.log("[Completionist] LOG 13: Cleanup");
       if (radarPatch) radarPatch.unpatch();
     }
   };
