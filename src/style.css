@@ -1,0 +1,16 @@
+/* Style par défaut du sticker dans la bannière */
+.sticker-banner {
+    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+    border-radius: 8px;
+    border: 2px solid transparent;
+}
+
+/* État quand le joystick s'arrête dessus */
+.sticker-banner:focus,
+.sticker-banner.gpfocus {
+    transform: scale(1.1);
+    border-color: #1a9fff; /* Bleu Steam */
+    box-shadow: 0 0 15px rgba(26, 159, 255, 0.8);
+    background-color: rgba(255, 255, 255, 0.1);
+    outline: none;
+}

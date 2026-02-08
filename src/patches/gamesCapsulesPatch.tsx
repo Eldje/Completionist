@@ -3,7 +3,7 @@ import { GameSticker } from "../components/GameSticker";
 
 const React = (window as any).SP_REACT;
 
-export const initGamesCapsulesPatch = (): Patch | undefined => {
+export const initGamesCapsulesPatch = (onFirstRender: () => void): Patch | undefined => {
   if (!React) return undefined;
 
   console.log("[Completionist] LOG 2b: Initializing Capsules Patch");
@@ -20,6 +20,12 @@ export const initGamesCapsulesPatch = (): Patch | undefined => {
       
       TargetClass.prototype.render = function(...renderArgs: any[]) {
         const renderRet = originalRender.apply(this, renderArgs);
+        
+        if (onFirstRender) {
+          onFirstRender();
+          // On vide la fonction pour ne plus jamais l'appeler
+          onFirstRender = () => {}; 
+        }
         
         // Safety check to avoid the "Cannot read properties of undefined" crash
         const currentAppId = this.props?.app?.appid;

@@ -1,36 +1,56 @@
-const React = (window as any).SP_REACT;
+import { Focusable } from "@decky/ui";
+// Note : React est importé via SP_REACT dans tes fichiers de patches si nécessaire
+// Ici on suppose une intégration standard dans le composant
 
-interface StickerProps {
+interface GameStickerProps {
   appId: number;
   variant: "banner" | "capsule";
 }
 
-/**
- * Shared Sticker Component.
- * variant "banner": Bottom-right for Game Detail.
- * variant "capsule": Top-right for Library.
- */
-export const GameSticker = React.memo(({ appId, variant }: StickerProps) => {
-  console.log(`[Completionist] LOG 10: Rendering Sticker (${variant}) for App ${appId}`);
+export const GameSticker = ({ appId, variant }: GameStickerProps) => {
+  
+  const isBanner = variant === "banner";
 
-  const styles: any = variant === "banner" 
-    ? { bottom: "10px", right: "10px", padding: "6px 12px", fontSize: "14px" }
-    : { top: "5px", right: "5px", padding: "2px 6px", fontSize: "10px" };
+  const handleUpdate = (e?: any) => {
+    e?.stopPropagation();
+    console.log(`[Completionist] LOG 10: Manual update requested for AppID ${appId}`);
+    
+    // Utilisation de 'call' comme demandé dans vos instructions
+    // @ts-ignore (si call n'est pas encore typé globalement)
+    window.call("refresh_game_data", { appid: appId });
+  };
 
+  const commonStyle: React.CSSProperties = {
+    position: "absolute",
+    top: "10px",
+    right: "10px",
+    zIndex: 100,
+  };
+
+  // COMPORTEMENT 1 : Vue Détails (Focusable et Cliquable)
+  if (isBanner) {
+    return (
+      <Focusable
+        style={{ ...commonStyle, cursor: "pointer", pointerEvents: "all" }}
+        onClick={handleUpdate}
+        // Pour la navigation Manette/Joystick (Bouton A)
+        onButtonDown={(e: any) => {
+          if (e.detail.button === 0) handleUpdate(e);
+        }}
+      >
+        <div className="sticker-content" style={{ padding: "5px", background: "rgba(0,0,0,0.5)", borderRadius: "4px" }}>
+          🏆
+        </div>
+      </Focusable>
+    );
+  }
+
+  // COMPORTEMENT 2 : Capsules (Simple affichage, invisible pour le joystick)
   return (
-    <div style={{
-      position: "absolute",
-      backgroundColor: "#1a9fff",
-      color: "white",
-      borderRadius: "4px",
-      zIndex: 9999,
-      border: "1px solid rgba(255,255,255,0.4)",
-      fontWeight: "bold",
-      boxShadow: "0 2px 8px rgba(0,0,0,0.6)",
-      pointerEvents: "none",
-      ...styles
-    }}>
-      ID: {appId}
+    <div style={{ ...commonStyle, pointerEvents: "none" }}>
+      <div className="sticker-content">
+        🏆
+      </div>
     </div>
   );
-}) as any;
+};
