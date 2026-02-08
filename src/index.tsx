@@ -2,6 +2,7 @@ import { definePlugin } from "@decky/api";
 import { FaCircle } from "react-icons/fa";
 import { initGameDetailPatch } from "./patches/gameDetailPatch";
 import { initGamesCapsulesPatch } from "./patches/gamesCapsulesPatch";
+import contextMenuPatch, { LibraryContextMenu } from './patches/contextMenuPatch';
 import { Patch } from "@decky/ui";
 
 export default definePlugin(() => {
@@ -26,6 +27,8 @@ export default definePlugin(() => {
       capsuleHandle = undefined;
     }
   });
+
+  contextMenuPatch(LibraryContextMenu);
 
   return {
     name: "completionist",
