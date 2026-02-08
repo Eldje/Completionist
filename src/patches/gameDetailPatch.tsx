@@ -1,4 +1,4 @@
-import { afterPatch, Patch } from "@decky/ui";
+import { afterPatch, wrapReactType, Patch } from "@decky/ui";
 import { GameSticker } from "../components/GameSticker";
 
 const React = (window as any).SP_REACT;
@@ -6,30 +6,47 @@ const React = (window as any).SP_REACT;
 export const initGameDetailPatch = (): Patch | undefined => {
   if (!React) return undefined;
 
-  console.log("[Completionist] LOG 2a: Initializing GameDetail Patch");
+  console.log("[Completionist] LOG 2a: Patching 'oe' Overview Class (The Holy Grail)");
 
   return afterPatch(React, "createElement", (_, ret: any) => {
-    const logoUrl = ret?.props?.strLogoImageURL;
-    if (!logoUrl || ret.__alreadyWrapped) return ret;
+    // 1. On vérifie d'abord si l'overview existe
+    const hasOverview = ret?.props?.overview;
+    if (!hasOverview) return ret;
 
-    console.log("[Completionist] LOG 4a: Logo detected ->", logoUrl);
-
-    const match = logoUrl.match(/\/assets\/([0-9]+)\//);
-    const appId = match ? parseInt(match[1]) : null;
-    if (!appId) return ret;
-
-    try {
-      const newRet = React.createElement(
-        "div",
-        { style: { position: "relative", display: "contents" }, __alreadyWrapped: true },
-        ret,
-        React.createElement(GameSticker, { appId: appId, variant: "banner" })
-      );
-      newRet.__alreadyWrapped = true;
-      return newRet;
-    } catch (e) {
-      console.error("[Completionist] LOG ERROR: GameDetail encapsulation failed", e);
-      return ret;
+    // 2. FILTRE : On ne veut que le composant 'oe'
+    if (ret.props.details) {
+        return ret; 
     }
+    const TargetClass = ret.type;
+
+    // Patch de Prototype : Robuste, Persistant, Indestructible
+    if (typeof TargetClass === 'function' && TargetClass.prototype?.render && !TargetClass.prototype.render.__patched) {
+
+      console.log("[Completionist] LOG 6a: Patching 'oe' Prototype.render for AppID:", ret.props.overview.appid);
+      const originalRender = TargetClass.prototype.render;
+
+      TargetClass.prototype.render = function (...renderArgs: any[]) {
+        const renderRet = originalRender.apply(this, renderArgs);
+
+        // Extraction directe et ultra-fiable de l'ID
+        const appId = this.props?.overview?.appid || 0;
+
+        if (!appId) return renderRet;
+
+        console.log(`[Completionist] LOG 8a: Rendering Badge via 'oe' Prototype for ID ${appId}`);
+
+        // On injecte le badge dans le container de l'en-tête
+        return (
+          <div style={{ position: "relative", display: "contents" }}>
+            {renderRet}
+            <GameSticker appId={appId} variant="banner" />
+          </div>
+        );
+      };
+
+      TargetClass.prototype.render.__patched = true;
+      wrapReactType(TargetClass);
+    }
+    return ret;
   });
 };

@@ -6,16 +6,16 @@ interface StickerProps {
 }
 
 /**
- * Shared Sticker Component
- * variant "banner": Bottom-right, larger.
- * variant "capsule": Top-right, smaller.
+ * Shared Sticker Component.
+ * variant "banner": Bottom-right for Game Detail.
+ * variant "capsule": Top-right for Library.
  */
 export const GameSticker = React.memo(({ appId, variant }: StickerProps) => {
-  console.log(`[Completionist] LOG 10: Rendering Sticker (${variant}) for ID ${appId}`);
+  console.log(`[Completionist] LOG 10: Rendering Sticker (${variant}) for App ${appId}`);
 
   const styles: any = variant === "banner" 
-    ? { bottom: "10px", right: "10px", padding: "6px 12px", fontSize: "12px" }
-    : { top: "10px", right: "10px", padding: "2px 6px", fontSize: "10px" };
+    ? { bottom: "10px", right: "10px", padding: "6px 12px", fontSize: "14px" }
+    : { top: "5px", right: "5px", padding: "2px 6px", fontSize: "10px" };
 
   return (
     <div style={{

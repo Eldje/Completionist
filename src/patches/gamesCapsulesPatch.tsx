@@ -13,7 +13,6 @@ export const initGamesCapsulesPatch = (): Patch | undefined => {
     if (!appId) return ret;
 
     const TargetClass = ret.type;
-    // On vérifie si c'est un composant de classe avec une méthode render
     if (typeof TargetClass === 'function' && TargetClass.prototype?.render && !TargetClass.prototype.render.__patched) {
       
       console.log(`[Completionist] LOG 6b: Patching Capsule Prototype for App ${appId}`);
@@ -22,13 +21,14 @@ export const initGamesCapsulesPatch = (): Patch | undefined => {
       TargetClass.prototype.render = function(...renderArgs: any[]) {
         const renderRet = originalRender.apply(this, renderArgs);
         
-        // LOG 8b: Vérification de l'exécution du rendu de la capsule
-        console.log(`[Completionist] LOG 8b: Rendering Capsule for ${this.props.app.appid}`);
+        // Safety check to avoid the "Cannot read properties of undefined" crash
+        const currentAppId = this.props?.app?.appid;
+        if (!currentAppId) return renderRet;
 
         return renderRet ? (
           <React.Fragment>
             {renderRet}
-            <GameSticker appId={this.props.app.appid} variant="capsule" />
+            <GameSticker appId={currentAppId} variant="capsule" />
           </React.Fragment>
         ) : renderRet;
       };
