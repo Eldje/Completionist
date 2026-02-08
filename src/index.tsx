@@ -1,4 +1,3 @@
-import "./style.css";
 import { definePlugin } from "@decky/api";
 import { FaCircle } from "react-icons/fa";
 import { initGameDetailPatch } from "./patches/gameDetailPatch";
