@@ -24,6 +24,7 @@ export const GameSticker = React.memo(({ appId, variant }: StickerProps) => {
       color: "white",
       borderRadius: "4px",
       zIndex: 9999,
+      transform: "translateZ(1px)",
       border: "1px solid rgba(255,255,255,0.4)",
       fontWeight: "bold",
       boxShadow: "0 2px 8px rgba(0,0,0,0.6)",

@@ -1,4 +1,4 @@
-import { afterPatch, wrapReactType, Patch } from "@decky/ui";
+import { afterPatch, Patch } from "@decky/ui";
 import { GameSticker } from "../components/GameSticker";
 
 const React = (window as any).SP_REACT;
@@ -6,41 +6,39 @@ const React = (window as any).SP_REACT;
 export const initGamesCapsulesPatch = (onFirstRender: () => void): Patch | undefined => {
   if (!React) return undefined;
 
-  console.log("[Completionist] LOG 2b: Initializing Capsules Patch");
-
   return afterPatch(React, "createElement", (_, ret: any) => {
     const appId = ret?.props?.app?.appid;
     if (!appId) return ret;
 
-    const TargetClass = ret.type;
-    if (typeof TargetClass === 'function' && TargetClass.prototype?.render && !TargetClass.prototype.render.__patched) {
-      
-      console.log(`[Completionist] LOG 6b: Patching Capsule Prototype for App ${appId}`);
-      const originalRender = TargetClass.prototype.render;
-      
-      TargetClass.prototype.render = function(...renderArgs: any[]) {
+    const Target = ret.type;
+    if (Target.prototype?.render && !Target.prototype.render.__patched) {
+      const originalRender = Target.prototype.render;
+
+      Target.prototype.render = function (...renderArgs: any[]) {
         const renderRet = originalRender.apply(this, renderArgs);
-        
+
+        // Activate unpatch function at the first render because 
+        // it will be no longer needed after that because the prototype 
+        // ot the render function for the game detail element has been patched
         if (onFirstRender) {
           onFirstRender();
-          // On vide la fonction pour ne plus jamais l'appeler
-          onFirstRender = () => {}; 
+          // Releasing the unpath function to not call it again after first render
+          //onFirstRender = () => { };
         }
-        
-        // Safety check to avoid the "Cannot read properties of undefined" crash
-        const currentAppId = this.props?.app?.appid;
-        if (!currentAppId) return renderRet;
 
+        // Get current appId at time of render
+        const appId = this.props?.app?.appid;
+
+        // Adding the badge to the element
         return renderRet ? (
           <React.Fragment>
             {renderRet}
-            <GameSticker appId={currentAppId} variant="capsule" />
+            <GameSticker appId={appId} variant="capsule" />
           </React.Fragment>
         ) : renderRet;
       };
 
-      TargetClass.prototype.render.__patched = true;
-      wrapReactType(TargetClass);
+      Target.prototype.render.__patched = true;
     }
     return ret;
   });

@@ -1,4 +1,4 @@
-import { afterPatch, wrapReactType, Patch } from "@decky/ui";
+import { afterPatch, Patch } from "@decky/ui";
 import { GameSticker } from "../components/GameSticker";
 
 const React = (window as any).SP_REACT;
@@ -10,21 +10,30 @@ export const initGameDetailPatch = (onFirstRender: () => void): Patch | undefine
     const overview = ret?.props?.overview;
     if (!overview || ret.props.details) return ret;
 
-    const TargetClass = ret.type;
+    const appId = ret.props?.overview?.appid;
+    if (!appId) return ret;
 
-    if (typeof TargetClass === 'function' && TargetClass.prototype?.render && !TargetClass.prototype.render.__patched) {
-      const originalRender = TargetClass.prototype.render;
+    const Target = ret.type;
 
-      TargetClass.prototype.render = function(...renderArgs: any[]) {
+    if (Target.prototype?.render && !Target.prototype.render.__patched) {
+      const originalRender = Target.prototype.render;
+
+      Target.prototype.render = function (...renderArgs: any[]) {
         const renderRet = originalRender.apply(this, renderArgs);
-        
+
+        // Activate unpatch function at the first render because 
+        // it will be no longer needed after that because the prototype 
+        // ot the render function for the game detail element has been patch
         if (onFirstRender) {
           onFirstRender();
-          // On vide la fonction pour ne plus jamais l'appeler
-          onFirstRender = () => {}; 
+          // Releasing the unpath function to not call it again after first render
+          //onFirstRender = () => { };
         }
 
-        const appId = this.props?.overview?.appid || 0;
+        // Get current appId at time of render
+        const appId = this.props?.overview?.appid;
+
+        // Adding the badge to the element
         return (
           <div style={{ position: "relative", display: "contents" }}>
             {renderRet}
@@ -33,8 +42,7 @@ export const initGameDetailPatch = (onFirstRender: () => void): Patch | undefine
         );
       };
 
-      TargetClass.prototype.render.__patched = true;
-      wrapReactType(TargetClass);
+      Target.prototype.render.__patched = true;
     }
     return ret;
   });

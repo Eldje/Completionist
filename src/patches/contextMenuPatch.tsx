@@ -5,124 +5,137 @@ import {
   findModuleByExport,
   Export,
   MenuItem,
-  Navigation,
   Patch,
   findInTree,
 } from '@decky/ui';
 import { FC } from 'react';
 
-// Always add before "Properties..."
-const spliceArtworkItem = (children: any[], appid: number) => {
-  children.find((x: any) => x?.key === 'properties');
-  const propertiesMenuItemIdx = children.findIndex((item) =>
+import t from '../utils/i18n';
+
+/**
+ * MENU ACTIONS REGISTRY
+ * Using a registry makes it easy to add/remove actions globally.
+ */
+const COMPLETIONIST_ACTIONS = [
+  { id: 'completed', key: 'completionist-mark-completed', labelKey: 'ACTION_MARK_COMPLETED', defaultLabel: 'Mark as Completed' },
+  { id: 'full', key: 'completionist-mark-full-completed', labelKey: 'ACTION_MARK_FULLCOMPLETED', defaultLabel: 'Mark as 100% Completed' },
+  { id: 'favorite', key: 'completionist-mark-favorite', labelKey: 'ACTION_MARK_FAVORITE', defaultLabel: 'Mark as Favorite' },
+  { id: 'todo', key: 'completionist-mark-todo', labelKey: 'ACTION_MARK_TODO', defaultLabel: 'Mark as To-Do' }
+];
+
+/**
+ * Removes existing items from this plugin using their unique keys.
+ */
+const handleItemDupes = (items: any[]) => {
+  if (!items) return;
+  const actionKeys = COMPLETIONIST_ACTIONS.map(a => a.key);
+  
+  for (let i = items.length - 1; i >= 0; i--) {
+    if (items[i] && actionKeys.includes(items[i].key)) {
+      items.splice(i, 1);
+    }
+  }
+};
+
+/**
+ * Splices items into the menu, anchored to the "Properties" item.
+ */
+const spliceBadgeItems = (children: any[], appid: number) => {
+  const propertiesIdx = children.findIndex((item) =>
     findInReactTree(item, (x) => x?.onSelected && x.onSelected.toString().includes('AppProperties'))
   );
-  children.splice(propertiesMenuItemIdx, 0, (
+
+  const targetIdx = propertiesIdx !== -1 ? propertiesIdx : children.length;
+
+  const newItems = COMPLETIONIST_ACTIONS.map((action) => (
     <MenuItem
-      key="completionist-change-badge"
-      onSelected={() => {
-        Navigation.Navigate(`/completionist/${appid}`);
+      key={action.key}
+      onSelected={async () => {
+        console.log(`[completionist] LOG: Action ${action.id} triggered for AppID ${appid}`);
+        try {
+          // @ts-ignore
+          await call("toggle_and_reload", { appid: appid, action: action.id });
+        } catch (e) {
+          console.error(`[completionist] LOG ERROR: Call failed for action ${action.id}`, e);
+        }
       }}
     >
-      {'Changer le badge...'}
+      {t(action.labelKey, action.defaultLabel)}
     </MenuItem>
   ));
+
+  children.splice(targetIdx, 0, ...newItems);
 };
 
-// Check if correct menu by looking at the code of the onSelected function
-// Should be enough to ignore the screenshots and other menus.
-const isOpeningAppContextMenu = (items: any[]) => {
-  if (!items?.length) {
-    return false;
+/**
+ * LANGUAGE-AGNOSTIC VALIDATION
+ * Instead of checking for "Gérer", we check for the 'Uninstall' key.
+ * If 'Uninstall' is present, we are in the Manage sub-menu and we abort.
+ */
+const isValidMenu = (items: any[]) => {
+  if (!items?.length) return false;
+
+  // 1. Language-independent check: The 'Manage' sub-menu always has 'Uninstall'
+  const hasUninstallKey = items.some((x: any) => x?.key === 'Uninstall');
+  if (hasUninstallKey) {
+    return false; 
   }
-  return !!findInReactTree(items, (x) => x?.props?.onSelected && x?.props?.onSelected.toString().includes('launchSource'));
-};
 
-const handleItemDupes = (items: any[]) => {
-  const sgdbIdx = items.findIndex((x: any) => x?.key === 'completionist-change-badge');
-  if (sgdbIdx != -1) items.splice(sgdbIdx, 1);
+  // 2. Identify the main context menu by its essential items
+  return !!findInReactTree(items, (x) => 
+    x?.props?.onSelected && 
+    (x.props.onSelected.toString().includes('launchSource') || 
+     x.props.onSelected.toString().includes('AppProperties'))
+  );
 };
 
 const patchMenuItems = (menuItems: any[], appid: number) => {
   let updatedAppid: number = appid;
-  // find the first menu component that has the correct appid, sometimes the one passed is cached from another context menu
-  const parentOverview = menuItems.find((x: any) => x?._owner?.pendingProps?.overview?.appid &&
-    x._owner.pendingProps.overview.appid !== appid
+  
+  const parentOverview = menuItems.find((x: any) => 
+    x?._owner?.pendingProps?.overview?.appid && x._owner.pendingProps.overview.appid !== appid
   );
-  // if found then use that appid
-  if (parentOverview) {
-    updatedAppid = parentOverview._owner.pendingProps.overview.appid;
-  }
-  // Oct 2025 client
-  if (updatedAppid === appid) {
-    const foundApp = findInTree(menuItems, (x) => x?.app?.appid, { walkable: ['props', 'children'] });
-    if (foundApp) {
-      updatedAppid = foundApp.app.appid;
-    }
-  }
-  spliceArtworkItem(menuItems, updatedAppid);
+  if (parentOverview) updatedAppid = parentOverview._owner.pendingProps.overview.appid;
+
+  const foundApp = findInTree(menuItems, (x) => x?.app?.appid, { walkable: ['props', 'children'] });
+  if (foundApp) updatedAppid = foundApp.app.appid;
+
+  handleItemDupes(menuItems);
+  spliceBadgeItems(menuItems, updatedAppid);
 };
 
-/**
- * Patches the game context menu.
- * @param LibraryContextMenu The game context menu.
- * @returns A patch to remove when the plugin dismounts.
- */
 const contextMenuPatch = (LibraryContextMenu: any) => {
-  const patches: {
-    outer?: Patch,
-    inner?: Patch,
-    unpatch: () => void;
-  } = { unpatch: () => {return null;} };
-  patches.outer = afterPatch(LibraryContextMenu.prototype, 'render', (_: Record<string, unknown>[], component: any) => {
-    let appid: number = 1018880;
+  const patches: { outer?: Patch, inner?: Patch, unpatch: () => void } = { unpatch: () => {} };
+
+  patches.outer = afterPatch(LibraryContextMenu.prototype, 'render', (_: any, component: any) => {
+    let appid: number = 0;
     if (component._owner) {
       appid = component._owner.pendingProps.overview.appid;
     } else {
-      // Oct 2025 client
       const foundApp = findInTree(component.props.children, (x) => x?.app?.appid, { walkable: ['props', 'children'] });
-      if (foundApp) {
-        appid = foundApp.app.appid;
-      }
+      if (foundApp) appid = foundApp.app.appid;
     }
 
     if (!patches.inner) {
       patches.inner = afterPatch(component, 'type', (_: any, ret: any) => {
-        // initial render
         afterPatch(ret.type.prototype, 'render', (_: any, ret2: any) => {
-          const menuItems = ret2.props.children[0]; // always the first child
-          if (!isOpeningAppContextMenu(menuItems)) return ret2;
-          try {
-            handleItemDupes(menuItems);
-          } catch (error) {
-            return ret2;
-          }
+          const menuItems = ret2.props.children[0];
+          
+          // No longer passing props as we don't need to check text labels
+          if (!isValidMenu(menuItems)) return ret2;
+          
           patchMenuItems(menuItems, appid);
           return ret2;
-        });
-
-        // when steam decides to regresh app overview
-        afterPatch(ret.type.prototype, 'shouldComponentUpdate', ([nextProps]: any, shouldUpdate: any) => {
-          try {
-            handleItemDupes(nextProps.children);
-          } catch (error) {
-            // wrong context menu (probably)
-            return shouldUpdate;
-          }
-
-          if (shouldUpdate === true) {
-            patchMenuItems(nextProps.children, appid);
-          }
-
-          return shouldUpdate;
         });
         return ret;
       });
     } else {
-      spliceArtworkItem(component.props.children, appid);
+      const menuItems = component.props.children[0];
+      if (isValidMenu(menuItems)) patchMenuItems(menuItems, appid);
     }
     return component;
   });
+
   patches.unpatch = () => {
     patches.outer?.unpatch();
     patches.inner?.unpatch();
@@ -130,9 +143,6 @@ const contextMenuPatch = (LibraryContextMenu: any) => {
   return patches;
 };
 
-/**
- * Game context menu component.
- */
 export const LibraryContextMenu = fakeRenderComponent(
   Object.values(
     findModuleByExport((e: Export) => e?.toString && e.toString().includes('().LibraryContextMenu'))
